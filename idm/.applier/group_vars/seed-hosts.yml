@@ -1,0 +1,29 @@
+namespace: idm
+
+deploy:
+  IDM_HOSTNAME: "idm.example.com"
+  IDM_INSTALL_OPTS: "-U -r EXAMPLE.COM --setup-dns --no-forwarders --no-ntp"
+  IDM_ADMIN_PASSWORD: "examplepassword"
+  IDM_SERVICE: "idm-server"
+
+  
+
+openshift_cluster_content:
+- object: Environment Setup
+  content:
+  - name: Create Projects
+    template: "https://raw.githubusercontent.com/redhat-cop/cluster-lifecycle/v3.9.0/files/projectrequest/template.yml"
+    action: create
+    params_from_vars:
+      NAMESPACE: "{{ namespace }}"
+      NAMESPACE_DISPLAY_NAME: "{{ namespace }}"
+    tags:
+      - project
+- object: Deployments
+  content:
+  - name: idm
+    template: "{{ inventory_dir }}/../.openshift/templates/idm-server.yml"
+    params_from_vars: "{{ deploy }}"
+    namespace: "{{ namespace }}"
+    tags:
+    - deploy

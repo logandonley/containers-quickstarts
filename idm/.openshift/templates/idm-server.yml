@@ -1,0 +1,433 @@
+{
+    "kind": "Template",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "idm-server",
+        "annotations": {
+            "openshift.io/display-name": "IdM Server",
+            "description": "IdM Server",
+            "tags": "quickstart,idm,identity management"
+        }
+    },
+    "labels": {
+        "template": "idm-server"
+    },
+    "objects": [
+        {
+            "kind": "Route",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${IDM_SERVICE}-https",
+                "annotations": {
+                    "description": "Route for idm server's HTTPS"
+                }
+            },
+            "spec": {
+                "host": "${IDM_HOSTNAME}",
+                "to": {
+                    "kind": "Service",
+                    "name": "${IDM_SERVICE}"
+                },
+                "port": {
+                    "targetPort": "https"
+                },
+                "tls": {
+                    "termination": "passthrough"
+                }
+            }
+        },
+        {
+            "kind": "ImageStream",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${IDM_SERVICE}"
+            },
+            "spec": {
+                "tags": [
+                    {
+                        "name": "latest",
+                        "from": {
+                            "kind": "DockerImage",
+                            "name": "registry.access.redhat.com/rhel7/ipa-server:latest"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "kind": "Secret",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${IDM_SERVICE}-password"
+            },
+            "stringData" : {
+                "admin.password" : "${IDM_ADMIN_PASSWORD}"
+            }
+        },
+        {
+            "kind": "Service",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${IDM_SERVICE}"
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "name": "dns-tcp",
+                        "protocol": "TCP",
+                        "port": 53,
+                        "targetPort": 53
+                    },
+                    {
+                        "name": "dns-udp",
+                        "protocol": "UDP",
+                        "port": 53,
+                        "targetPort": 53
+                    },
+                    {
+                        "name": "http",
+                        "protocol": "TCP",
+                        "port": 80,
+                        "targetPort": 80
+                    },
+                    {
+                        "name": "kerberos-tcp",
+                        "protocol": "TCP",
+                        "port": 88,
+                        "targetPort": 88
+                    },
+                    {
+                        "name": "kerberos-udp",
+                        "protocol": "UDP",
+                        "port": 88,
+                        "targetPort": 88
+                    },
+                    {
+                        "name": "ntp",
+                        "protocol": "UDP",
+                        "port": 123,
+                        "targetPort": 123
+                    },
+                    {
+                        "name": "ldap",
+                        "protocol": "TCP",
+                        "port": 389,
+                        "targetPort": 389
+                    },
+                    {
+                        "name": "https",
+                        "protocol": "TCP",
+                        "port": 443,
+                        "targetPort": 443
+                    },
+                    {
+                        "name": "kpasswd-tcp",
+                        "protocol": "TCP",
+                        "port": 464,
+                        "targetPort": 464
+                    },
+                    {
+                        "name": "kpasswd-udp",
+                        "protocol": "UDP",
+                        "port": 464,
+                        "targetPort": 464
+                    },
+                    {
+                        "name": "ldaps",
+                        "protocol": "TCP",
+                        "port": 636,
+                        "targetPort": 636
+                    },
+                    {
+                        "name": "ldap-replication",
+                        "protocol": "TCP",
+                        "port": 7389,
+                        "targetPort": 7389
+                    },
+                    {
+                        "name": "ca-webui",
+                        "protocol": "TCP",
+                        "port": 9443,
+                        "targetPort": 9443
+                    },
+                    {
+                        "name": "ca-https",
+                        "protocol": "TCP",
+                        "port": 9444,
+                        "targetPort": 9444
+                    },
+                    {
+                        "name": "ca-admin",
+                        "protocol": "TCP",
+                        "port": 9445,
+                        "targetPort": 9445
+                    }
+                ],
+                "selector": {
+                    "deploymentconfig": "${IDM_SERVICE}"
+                }
+            }
+        },
+        {
+            "kind": "DeploymentConfig",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${IDM_SERVICE}",
+                "labels": {
+                    "deploymentconfig": "${IDM_SERVICE}"
+                }
+            },
+            "spec": {
+                "strategy": {
+                    "type": "Recreate",
+                    "recreateParams": {
+                        "timeoutSeconds": "${TIMEOUT}"
+                    }
+                },
+                "triggers": [
+                    {
+                        "type": "ConfigChange"
+                    },
+                    {
+                        "type": "ImageChange",
+                        "imageChangeParams": {
+                            "automatic": true,
+                            "containerNames": [
+                                "${IDM_SERVICE}"
+                            ],
+                            "from": {
+                                "kind": "ImageStreamTag",
+                                "name": "${IDM_IMAGE}"
+                            }
+                        }
+                    }
+                ],
+                "replicas": 1,
+                "test": false,
+                "selector": {
+                    "deploymentconfig": "${IDM_SERVICE}"
+                },
+                "template": {
+                    "metadata": {
+                        "name": "${IDM_SERVICE}",
+                        "labels": {
+                            "deploymentconfig": "${IDM_SERVICE}"
+                        }
+                    },
+                    "spec": {
+                        "volumes": [
+                            {
+                                "name": "${IDM_SERVICE}-data",
+                                "persistentVolumeClaim": {
+                                    "claimName": "${IDM_SERVICE}"
+                                }
+                            },
+                            {
+                                "name": "${IDM_SERVICE}-run",
+                                "emptyDir": {}
+                            },
+                            {
+                                "name": "${IDM_SERVICE}-tmp",
+                                "emptyDir": {}
+                            },
+                            {
+                                "name": "${IDM_SERVICE}-journal",
+                                "emptyDir": {}
+                            }
+                        ],
+                        "containers": [
+                            {
+                                "name": "${IDM_SERVICE}",
+                                "image": " ",
+                                "ports": [
+                                    {
+                                        "containerPort": 53,
+                                        "protocol": "TCP"
+                                    },
+                                    {
+                                        "containerPort": 53,
+                                        "protocol": "UDP"
+                                    },
+                                    {
+                                        "containerPort": 80,
+                                        "protocol": "TCP"
+                                    },
+                                    {
+                                        "containerPort": 88,
+                                        "protocol": "TCP"
+                                    },
+                                    {
+                                        "containerPort": 88,
+                                        "protocol": "UDP"
+                                    },
+                                    {
+                                        "containerPort": 123,
+                                        "protocol": "UDP"
+                                    },
+                                    {
+                                        "containerPort": 389,
+                                        "protocol": "TCP"
+                                    },
+                                    {
+                                        "containerPort": 443,
+                                        "protocol": "TCP"
+                                    },
+                                    {
+                                        "containerPort": 464,
+                                        "protocol": "TCP"
+                                    },
+                                    {
+                                        "containerPort": 464,
+                                        "protocol": "UDP"
+                                    },
+                                    {
+                                        "containerPort": 636,
+                                        "protocol": "TCP"
+                                    },
+                                    {
+                                        "containerPort": 7389,
+                                        "protocol": "TCP"
+                                    },
+                                    {
+                                        "containerPort": 9443,
+                                        "protocol": "TCP"
+                                    },
+                                    {
+                                        "containerPort": 9444,
+                                        "protocol": "TCP"
+                                    },
+                                    {
+                                        "containerPort": 9445,
+                                        "protocol": "TCP"
+                                    }
+                                ],
+                                "env": [
+                                    {
+                                        "name": "IPA_SERVER_HOSTNAME",
+                                        "value": "${IDM_HOSTNAME}"
+                                    },
+                                    {
+                                        "name": "IPA_SERVER_INSTALL_OPTS",
+                                        "value": "${IDM_INSTALL_OPTS}"
+                                    },
+                                    {
+                                        "name": "PASSWORD",
+                                        "valueFrom": {
+                                            "secretKeyRef" : {
+                                                "name" : "${IDM_SERVICE}-password",
+                                                "key" : "admin.password"
+                                            }
+                                        }
+                                    }
+                                ],
+                                "resources": {},
+                                "volumeMounts": [
+                                    {
+                                        "name": "${IDM_SERVICE}-data",
+                                        "mountPath": "/data"
+                                    },
+                                    {
+                                        "name": "${IDM_SERVICE}-run",
+                                        "mountPath": "/run"
+                                    },
+                                    {
+                                        "name": "${IDM_SERVICE}-tmp",
+                                        "mountPath": "/tmp"
+                                    },
+                                    {
+                                        "name": "${IDM_SERVICE}-journal",
+                                        "mountPath": "/var/log/journal"
+                                    }
+                                ],
+                                "readinessProbe": {
+                                    "exec": {
+                                        "command": [
+                                            "/usr/bin/systemctl", "status", "ipa"
+                                        ]
+                                    },
+                                    "initialDelaySeconds": 60,
+                                    "timeoutSeconds": 10,
+                                    "periodSeconds": 10,
+                                    "successThreshold": 1,
+                                    "failureThreshold": 3
+                                }
+                            }
+                        ],
+                        "restartPolicy": "Always",
+                        "serviceAccountName": "${SERVICE_ACCOUNT_USEROOT}",
+                        "securityContext": {}
+                    }
+                }
+            }
+        },
+        {
+            "kind": "PersistentVolumeClaim",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${IDM_SERVICE}"
+            },
+            "spec": {
+                "accessModes": [
+                    "ReadWriteOnce"
+                ],
+                "resources": {
+                    "requests": {
+                        "storage": "${VOLUME_CAPACITY}"
+                    }
+                }
+            }
+        }
+    ],
+    "parameters": [
+        {
+            "name": "IDM_SERVICE",
+            "displayName": "Service and deployment config name",
+            "required": true,
+            "value": "idm-server"
+        },
+        {
+            "name": "IDM_IMAGE",
+            "displayName": "Image to use for the service",
+            "required": true,
+            "value": "idm-server:latest"
+        },
+        {
+            "name": "IDM_HOSTNAME",
+            "displayName": "idm server hostname",
+            "required": true,
+            "value": "ipa.example.test"
+        },
+        {
+            "name": "IDM_INSTALL_OPTS",
+            "displayName": "Options to ipa-server-install command",
+            "required": true,
+            "value": "-U -r EXAMPLE.TEST --setup-dns --no-forwarders --no-ntp"
+        },
+        {
+            "name": "IDM_ADMIN_PASSWORD",
+            "displayName": "Admin's password",
+            "required": false,
+            "from": "[a-zA-Z0-9]{32}",
+            "generate": "expression"
+        },
+        {
+            "name": "VOLUME_CAPACITY",
+            "displayName": "Volume capacity",
+            "required": true,
+            "value": "1Gi"
+        },
+        {
+            "name": "SERVICE_ACCOUNT_USEROOT",
+            "displayName": "Service account to use for running the pods",
+            "description": "It has to allow running containers as root, for example: oc create serviceaccount useroot ; oc adm policy add-scc-to-user anyuid -z useroot",
+            "required": false,
+            "value": "useroot"
+        },
+        {
+            "name": "TIMEOUT",
+            "displayName": "Timeout for pods to become ready (in seconds)",
+            "required": true,
+            "value": "600"
+        }
+    ]
+}
